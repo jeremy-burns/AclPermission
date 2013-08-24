@@ -20,44 +20,87 @@ class AclPermissionsController extends AclPermissionAppController {
 
     }
 
+    /**
+     * The core function that is run from the address bar
+     **/
+
     public function set_permissions() {
 
+    	// Get all of the permissions rows
     	$permissions = $this->AclPermission->find('all');
 
+    	// If there are none, stop here
     	if (!$permissions) {
-    		echo 'No permissions to set';
-    		exit;
+    		$this->Session->setFlash(
+				'No permissions to set.',
+				'flash/error'
+			);
+
+			$this->redirect('/');
     	}
 
+    	// Make sure there is a root controllers Aco - this will try to create it if it's missing.
     	$this->controllerAcoId = $this->__acoId('controllers', NULL, true);
 
+    	// If it's missing there's something wrong beyoind the scope of this plugin
     	if (!$this->controllerAcoId) {
-    		echo 'No controller node';
-    		exit;
+    		$this->Session->setFlash(
+				'Couldn\'t create the controlelrs Aco.',
+				'flash/error'
+			);
+
+			$this->redirect('/');
     	}
 
+    	// Loop through the permissions
     	foreach ($permissions as $permission) {
 
+    		// Get the subkeys
     		$permission = $permission['AclPermission'];
 
-    		if ($this->__nodeExists($permission['controller'], $permission['action'], true)) {
+    		// Create a node string - this handles plugin/no plugin etc.
+    		$node = implode('/', array($permission['plugin'], $permission['controller'], $permission['action']));
 
-    			if (!empty($permission['allow'])) {
-    				$this->__set_permission('allow', $permission['allow'], $permission['controller'] . '/' . $permission['action']);
-    			}
-    			if (!empty($permission['deny'])) {
-    				$this->__set_permission('deny', $permission['deny'], $permission['controller'] . '/' . $permission['action']);
+    		// Check the node exists - this will create them if needed if the second parameter is set to true
+    		if ($this->__nodeExists($node, true)) {
+
+    			// A convenience array
+    			$permissionTypes = array(
+    				0 => 'allow',
+    				1 => 'deny'
+    			);
+
+    			// Exmine and set each permission type
+    			// $permission[$permissionType] contains the concatentated list of group ids to set perms for
+    			foreach ($permissionTypes as $permissionType) {
+    				$this->__set_permission($permissionType, $permission[$permissionType], $node);
     			}
 
     		}
 
     	}
 
+    	// Done
+    	$this->Session->setFlash(
+			'The permissions have been set.',
+			'flash/success'
+		);
+
+		$this->redirect('/');
 
     }
 
+/**
+ * Gets the id of a node and can create if it is missing
+ *
+ * @param string $alias
+ * @param string $parentId
+ * @param int $autoCreate
+ * @return array id int
+ */
     private function __acoId($alias = '', $parentId = null, $autoCreate = false) {
 
+    	// Try and find the Aco using the alias and its parent
     	$aco = $this->Acl->Aco->find(
 			'first',
 			array(
@@ -68,30 +111,59 @@ class AclPermissionsController extends AclPermissionAppController {
 			)
 		);
 
+    	// If found, return its id
 		if (!empty($aco['Aco']['id'])) {
 			return $aco['Aco']['id'];
 		} else {
-			return $this->__createNode($alias, $parentId);
+			// If allowed, try to create the node
+			if ($autoCreate) {
+				return $this->__createNode($alias, $parentId);
+			} else {
+				return null;
+			}
 		}
 
     }
 
-	private function __nodeExists($controller = null, $action = null, $autoCreate = false) {
+/**
+ * Checks that a node exists - all along its path
+ *
+ * @param string $node
+ * @param int $autoCreate
+ * @return array id int
+ */
+	private function __nodeExists($node, $autoCreate = false) {
 
-		$parentAcoId = $this->__acoId($controller, $this->controllerAcoId, $autoCreate);
+		// The node comes in as a path with an unknown number of elements, so strip it apart
+		$node = explode('/', $node);
+
+		// Start of with the controllers node as the parent (top of the tree)
+		$parentAcoId = $this->controllerAcoId;
 
 		if ($parentAcoId) {
-			return $this->__acoId($action, $parentAcoId, true);
+			foreach ($node as $aco) {
+				// Now loop through each node part checking and creating
+				return $this->__acoId($aco, $parentAcoId, true);
+			}
 		} else {
 			return null;
 		}
 
 	}
 
+/**
+ * Creates a node
+ *
+ * @param string $alias
+ * @param int $parentAcoId
+ * @return array id int
+ */
 	private function __createNode($alias = null, $parentAcoId = null) {
 
+		// If no alias is suplpied, get outta here
 		if (!$alias) return false;
 
+		// Create the Aco - alias belongs to parent
 		$this->Acl->Aco->create(
 			array(
 				'parent_id' => $parentAcoId,
@@ -99,66 +171,61 @@ class AclPermissionsController extends AclPermissionAppController {
 			)
 		);
 
+		// Try and save it
 		if ($this->Acl->Aco->save()) {
+			// If successful, return the id
 			return $this->Acl->Aco->id;
 		} else {
+			// else, return false
 			return false;
 		}
 
 	}
 
-	private function __getParentAco($acoNode = null) {
+/**
+ * Set permissions for a given node
+ *
+ * @param string $permissionType
+ * @param int $groups
+ * @param int $node
+ * @return array booelan
+ */
+	private function __set_permission($permissionType = '', $groups, $node) {
 
-		foreach ($acoNodes as $key => $acoNode) {
-
-			$parentAco = $this->Acl->Aco->find(
-				'first',
-				array(
-					'conditions' => array(
-						'alias' => $acoNode,
-						'parent_id' => $parentAco
-					)
-				)
-			);
-
-			if ($parentAco) {
-				$parentAco = $parentAco['Aco']['id'];
-			} else {
-				return null;
-			}
-
-		}
-
-		return $parentAco;
-
-	}
-
-	private function __set_permission($permissionType = '', $groups = '', $newNode = '') {
-
+		// $groups holds the group ids concatenated with '/'
+		// so break them apart
 		$groups = explode('/', $groups);
 
+		// Now loop through them
 		foreach ($groups as $groupId) {
 
+			// Get the actual Group
 			$aclGroup = $this->AclGroup->findById($groupId);
 
+			// If the Group does not exist, get outta here
+			if (empty($aclGroup['AclGroup'])) {
+				return false;
+			}
+
+			// As the key is AclGroup rather than Group, create a new properly formed variable
 			$group['Group'] = $aclGroup['AclGroup'];
 
-			if ($group) {
+			// Make sure the group is OK
+			if (!empty($group['Group'])) {
+
+				// Then act on the permission type
+
+				// and set the appropraite permissions
 				if ($permissionType == 'allow') {
-					$this->Acl->allow($group, $newNode);
+					$this->Acl->allow($group, $node);
 				} else {
-					$this->Acl->deny($group, $newNode);
+					$this->Acl->deny($group, $node);
 				}
 			}
 
 		}
 
-		$this->Session->setFlash(
-			'The Permissions have been set.',
-			'flash/success'
-		);
-
-		$this->redirect('/');
+		return;
 
 	}
 
