@@ -27,7 +27,14 @@ class AclPermissionsController extends AclPermissionAppController {
     public function set_permissions() {
 
     	// Get all of the permissions rows
-    	$permissions = $this->AclPermission->find('all');
+    	$permissions = $this->AclPermission->find(
+    		'all',
+    		array(
+    			'conditions' => array(
+    				'AclPermission.complete' => 0
+    			)
+    		)
+    	);
 
     	// If there are none, stop here
     	if (!$permissions) {
@@ -73,7 +80,7 @@ class AclPermissionsController extends AclPermissionAppController {
     			// Exmine and set each permission type
     			// $permission[$permissionType] contains the concatentated list of group ids to set perms for
     			foreach ($permissionTypes as $permissionType) {
-    				$this->__set_permission($permissionType, $permission[$permissionType], $node);
+    				$this->__set_permission($permissionType, $permission, $node);
     			}
 
     		}
@@ -190,11 +197,11 @@ class AclPermissionsController extends AclPermissionAppController {
  * @param int $node
  * @return array booelan
  */
-	private function __set_permission($permissionType = '', $groups, $node) {
+	private function __set_permission($permissionType = '', $permission, $node) {
 
-		// $groups holds the group ids concatenated with '/'
+		// $permission[$permissionType] holds the group ids concatenated with '/'
 		// so break them apart
-		$groups = explode('/', $groups);
+		$groups = explode('/', $permission[$permissionType]);
 
 		// Now loop through them
 		foreach ($groups as $groupId) {
@@ -221,6 +228,11 @@ class AclPermissionsController extends AclPermissionAppController {
 				} else {
 					$this->Acl->deny($group, $node);
 				}
+
+				$this->AclPermission->id = $permission['AclPermission']['id'];
+				$this->AclPermission->set('complete', 1);
+				$this->AclPermission->save();
+
 			}
 
 		}
