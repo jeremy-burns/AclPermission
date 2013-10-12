@@ -7,7 +7,8 @@ class AclPermissionsController extends AclPermissionAppController {
 
     public $uses = array(
     	'AclPermission.AclPermission',
-    	'AclPermission.AclGroup'
+    	'AclPermission.AclGroup',
+    	'AclPermission.AclAcos'
     );
 
     public $name = 'AclPermissions';
@@ -15,6 +16,8 @@ class AclPermissionsController extends AclPermissionAppController {
     public function beforeFilter() {
 
     	parent::beforeFilter();
+
+    	$this->Auth->allow('reverse_engineer');
 
     }
 
@@ -254,6 +257,12 @@ class AclPermissionsController extends AclPermissionAppController {
 		}
 
 		return;
+
+	}
+
+	public function reverse_engineer() {
+
+		$aco = $this->AclAcos->reverse_engineer();
 
 	}
 
