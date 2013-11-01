@@ -16,8 +16,6 @@ class AclPermissionsController extends AclPermissionAppController {
 
     	parent::beforeFilter();
 
-    	$this->Auth->allow();
-
     }
 
     /**
