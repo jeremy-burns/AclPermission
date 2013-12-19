@@ -17,7 +17,7 @@ class AclPermissionsController extends AclPermissionAppController {
 
     	parent::beforeFilter();
 
-    	$this->Auth->allow('reverse_engineer');
+    	$this->Auth->allow('set_permissions', 'reverse_engineer');
 
     }
 
