@@ -13,7 +13,14 @@ class AclPermissionsController extends AclPermissionAppController {
 
     public $name = 'AclPermissions';
 
+	private $permissionTypes = array(
+		0 => 'allow',
+		1 => 'deny'
+	);
+
     public function beforeFilter() {
+
+		$this->userRoleModel = Configure::read('userRoleModel');
 
     	parent::beforeFilter();
 
@@ -51,7 +58,7 @@ class AclPermissionsController extends AclPermissionAppController {
     	// Make sure there is a root controllers Aco - this will try to create it if it's missing.
     	$this->controllerAcoId = $this->__acoId('controllers', NULL, true);
 
-    	// If it's missing there's something wrong beyoind the scope of this plugin
+    	// If it's missing there's something wrong beyond the scope of this plugin
     	if (!$this->controllerAcoId) {
 
     		$this->Session->setFlash(
@@ -85,15 +92,9 @@ class AclPermissionsController extends AclPermissionAppController {
     		// Check the node exists - this will create them if needed if the second parameter is set to true
     		if ($this->__nodeExists($node, true)) {
 
-    			// A convenience array
-    			$permissionTypes = array(
-    				0 => 'allow',
-    				1 => 'deny'
-    			);
-
     			// Examine and set each permission type
     			// $permission[$permissionType] contains the concatentated list of group ids to set perms for
-    			foreach ($permissionTypes as $permissionType) {
+    			foreach ($this->permissionTypes as $permissionType) {
     				$this->__set_permission($permissionType, $permission, $node);
     			}
 
@@ -222,6 +223,8 @@ class AclPermissionsController extends AclPermissionAppController {
 		// so break them apart
 		$groups = explode('/', $permission[$permissionType]);
 
+		$userRoleModel = Configure::read('userRoleModel');
+
 		// Now loop through them
 		foreach ($groups as $groupId) {
 
@@ -234,10 +237,10 @@ class AclPermissionsController extends AclPermissionAppController {
 			}
 
 			// As the key is AclGroup rather than Group, create a new properly formed variable
-			$group['Group'] = $aclGroup['AclGroup'];
+			$group[$userRoleModel] = $aclGroup['AclGroup'];
 
 			// Make sure the group is OK
-			if (!empty($group['Group'])) {
+			if (!empty($group[$userRoleModel])) {
 
 				// Then act on the permission type
 
