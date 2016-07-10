@@ -2,8 +2,21 @@
     "name": "classoutfit/acl-permission",
     "description": "A really simple bit of CakePHP Acl code that takes permissions for new or existing Acos, creates them if needed and then sets the permissions.",
 	"type": "cakephp-plugin",
+	"keywords": [
+        "cakephp",
+        "acl"
+    ],
+	"homepage": "http://classoutfit.com",
 	"license": "MIT",
+	"authors": [
+		{
+			"name": "Jeremy Burns",
+			"homepage": "http://classoutfit.com",
+			"role": "Author"
+		}
+	],
     "require": {
+		"cakephp/cakephp": "~2.8",
         "php": "^5.6",
 		"composer/installers": "*"
 	},
