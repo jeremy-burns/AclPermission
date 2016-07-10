@@ -1,4 +1,7 @@
 {
     "name": "classoutfit/acl-permission",
-    "description": "A really simple bit of CakePHP Acl code that takes permissions for new or existing Acos, creates them if needed and then sets the permissions."
+    "description": "A really simple bit of CakePHP Acl code that takes permissions for new or existing Acos, creates them if needed and then sets the permissions.",
+    "require": {
+        "php": "^5.6"
+    }
 }
