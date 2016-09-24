@@ -5,16 +5,14 @@ class AclAcos extends AclPermissionAppModel {
 
     public $useTable = 'acos';
 
-    public function reverse_engineer() {
+    public function reverseEngineer() {
 
-    	$aco = $this->find(
-			'threaded',
-			array(
-				'contain' => 'ArosAcos'
-			)
-		);
+        $aco = $this->find(
+            'threaded',
+            ['contain' => 'ArosAcos']
+        );
 
-		die(debug($aco));
+        die(debug($aco));
 
     }
 

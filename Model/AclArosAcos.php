@@ -5,9 +5,9 @@ class AclArosAcos extends AclPermissionAppModel {
 
     public $useTable = 'aros_acos';
 
-    public $belongsTo = array(
-    	'AclAros',
-    	'AclAcos'
-    );
+    public $belongsTo = [
+        'AclAros',
+        'AclAcos'
+    ];
 
 }
