@@ -2,11 +2,15 @@
 App::uses('AppModel', 'Model');
 
 class AclGroup extends AclPermissionAppModel {
-    public $actsAs = array('Acl' => array('type' => 'requester'));
+    public $actsAs = [
+        'Acl' => [
+            'type' => 'requester'
+        ]
+    ];
 
     public $useTable = false;
 
-    public function beforeFind($query = array()) {
+    public function beforeFind($query = []) {
 		$this->useTable = Inflector::tableize(Configure::read('userRoleModel'));
     }
 

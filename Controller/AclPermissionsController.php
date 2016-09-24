@@ -1,30 +1,30 @@
 <?php
 App::uses('AclComponent', 'Controller/Component');
 App::uses('AuthComponent', 'Controller/Component');
-App::uses('SessionComponent', 'Controller/Component');
+App::uses('FlashComponent', 'Controller/Component');
 
 class AclPermissionsController extends AclPermissionAppController {
 
-    public $uses = array(
-    	'AclPermission.AclPermission',
-    	'AclPermission.AclGroup',
-    	'AclPermission.AclAcos'
-    );
+    public $uses = [
+        'AclPermission.AclPermission',
+        'AclPermission.AclGroup',
+        'AclPermission.AclAcos'
+    ];
 
     public $name = 'AclPermissions';
 
-	private $permissionTypes = array(
-		0 => 'allow',
-		1 => 'deny'
-	);
+    private $permissionTypes = [
+        0 => 'allow',
+        1 => 'deny'
+    ];
 
-    public function beforeFilter() {
+    public function beforeFilter()
+    {
+        $this->userRoleModel = Configure::read('userRoleModel');
 
-		$this->userRoleModel = Configure::read('userRoleModel');
+        parent::beforeFilter();
 
-    	parent::beforeFilter();
-
-    	$this->Auth->allow('set_permissions', 'reverse_engineer');
+        $this->Auth->allow('set_permissions', 'reverse_engineer');
 
     }
 
@@ -32,83 +32,70 @@ class AclPermissionsController extends AclPermissionAppController {
      * The core function that is run from the address bar
      **/
 
-    public function set_permissions() {
+    public function set_permissions()
+    {
 
-    	// Get all of the permissions rows
-    	$permissions = $this->AclPermission->find(
-    		'all',
-    		array(
-    			'conditions' => array(
-    				'AclPermission.complete' => 0
-    			)
-    		)
-    	);
+        // Get all of the permissions rows
+        $permissions = $this->AclPermission->find(
+            'all',
+            [
+                'conditions' => [
+                    'AclPermission.complete' => 0
+                ]
+            ]
+        );
 
-    	// If there are none, stop here
-    	if (!$permissions) {
+        // If there are none, stop here
+        if (! $permissions) {
+            $this->Flash->error('No permissions to set.');
+            $this->redirect('/');
+        }
 
-    		$this->Session->setFlash(
-				'No permissions to set.',
-				'flash/error'
-			);
+        // Make sure there is a root controllers Aco - this will try to create it if it's missing.
+        $this->controllerAcoId = $this->acoId('controllers', NULL, true);
 
-			$this->redirect('/');
-    	}
+        // If it's missing there's something wrong beyond the scope of this plugin
+        if (! $this->controllerAcoId) {
+            $this->Flash->error('Couldn\'t create the controlelrs Aco.');
+            $this->redirect('/');
+        }
 
-    	// Make sure there is a root controllers Aco - this will try to create it if it's missing.
-    	$this->controllerAcoId = $this->__acoId('controllers', NULL, true);
+        // Loop through the permissions
+        foreach ($permissions as $permission) {
 
-    	// If it's missing there's something wrong beyond the scope of this plugin
-    	if (!$this->controllerAcoId) {
+            // Get the subkeys
+            $permission = $permission['AclPermission'];
 
-    		$this->Session->setFlash(
-				'Couldn\'t create the controlelrs Aco.',
-				'flash/error'
-			);
+            // Create a node string - this handles plugin/no plugin etc.
+            $node = implode(
+                '/',
+                [
+                    $permission['plugin'],
+                    $permission['controller'],
+                    $permission['action']
+                ]
+            );
 
-			$this->redirect('/');
+            // Strip a leading '/'
+            $node = ltrim ($node,'/');
 
-    	}
+            // Check the node exists - this will create them if needed if the second parameter is set to true
+            if ($this->nodeExists($node, true)) {
 
-    	// Loop through the permissions
-    	foreach ($permissions as $permission) {
+                // Examine and set each permission type
+                // $permission[$permissionType] contains the concatentated list of group ids to set perms for
+                foreach ($this->permissionTypes as $permissionType) {
+                    $this->setPermission($permissionType, $permission, $node);
+                }
 
-    		// Get the subkeys
-    		$permission = $permission['AclPermission'];
+            }
 
-    		// Create a node string - this handles plugin/no plugin etc.
-    		$node = implode(
-    			'/',
-    			array(
-    				$permission['plugin'],
-    				$permission['controller'],
-    				$permission['action']
-    			)
-    		);
+        }
 
-    		// Strip a leading '/'
-    		$node = ltrim ($node,'/');
+        // Done
+        $this->Flash->success('The permissions have been set.');
 
-    		// Check the node exists - this will create them if needed if the second parameter is set to true
-    		if ($this->__nodeExists($node, true)) {
-
-    			// Examine and set each permission type
-    			// $permission[$permissionType] contains the concatentated list of group ids to set perms for
-    			foreach ($this->permissionTypes as $permissionType) {
-    				$this->__set_permission($permissionType, $permission, $node);
-    			}
-
-    		}
-
-    	}
-
-    	// Done
-    	$this->Session->setFlash(
-			'The permissions have been set.',
-			'flash/success'
-		);
-
-		$this->redirect('/');
+        $this->redirect('/');
 
     }
 
@@ -120,30 +107,31 @@ class AclPermissionsController extends AclPermissionAppController {
  * @param int $autoCreate
  * @return array id int
  */
-    private function __acoId($alias = '', $parentId = null, $autoCreate = false) {
+    private function acoId($alias = '', $parentId = null, $autoCreate = false)
+    {
 
-    	// Try and find the Aco using the alias and its parent
-    	$aco = $this->Acl->Aco->find(
-			'first',
-			array(
-				'conditions' => array(
-					'alias' => $alias,
-					'parent_id' => $parentId
-				)
-			)
-		);
+        // Try and find the Aco using the alias and its parent
+        $aco = $this->Acl->Aco->find(
+            'first',
+            [
+                'conditions' => [
+                    'alias' => $alias,
+                    'parent_id' => $parentId
+                ]
+            ]
+        );
 
-    	// If found, return its id
-		if (!empty($aco['Aco']['id'])) {
-			return $aco['Aco']['id'];
-		} else {
-			// If allowed, try to create the node
-			if ($autoCreate) {
-				return $this->__createNode($alias, $parentId);
-			} else {
-				return null;
-			}
-		}
+        // If found, return its id
+        if (!empty($aco['Aco']['id'])) {
+            return $aco['Aco']['id'];
+        } else {
+            // If allowed, try to create the node
+            if ($autoCreate) {
+                return $this->createNode($alias, $parentId);
+            } else {
+                return null;
+            }
+        }
 
     }
 
@@ -154,29 +142,30 @@ class AclPermissionsController extends AclPermissionAppController {
  * @param int $autoCreate
  * @return array id int
  */
-	private function __nodeExists($node, $autoCreate = false) {
+    private function nodeExists($node, $autoCreate = false)
+    {
 
-		// The node comes in as a path with an unknown number of elements, so strip it apart
-		$node = explode('/', $node);
+        // The node comes in as a path with an unknown number of elements, so strip it apart
+        $node = explode('/', $node);
 
-		// Start of with the controllers node as the parent (top of the tree)
-		$parentAcoId = $this->controllerAcoId;
+        // Start of with the controllers node as the parent (top of the tree)
+        $parentAcoId = $this->controllerAcoId;
 
-		if ($parentAcoId) {
-			foreach ($node as $aco) {
-				// Now loop through each node part checking and creating
-				$parentAcoId = $this->__acoId($aco, $parentAcoId, true);
-			}
+        if ($parentAcoId) {
+            foreach ($node as $aco) {
+                // Now loop through each node part checking and creating
+                $parentAcoId = $this->acoId($aco, $parentAcoId, true);
+            }
 
-			return $parentAcoId;
+            return $parentAcoId;
 
-		} else {
+        } else {
 
-			return null;
+            return null;
 
-		}
+        }
 
-	}
+    }
 
 /**
  * Creates a node
@@ -185,29 +174,30 @@ class AclPermissionsController extends AclPermissionAppController {
  * @param int $parentAcoId
  * @return array id int
  */
-	private function __createNode($alias = null, $parentAcoId = null) {
+    private function createNode($alias = null, $parentAcoId = null)
+    {
 
-		// If no alias is suplpied, get outta here
-		if (!$alias) return false;
+        // If no alias is suplpied, get outta here
+        if (!$alias) return false;
 
-		// Create the Aco - alias belongs to parent
-		$this->Acl->Aco->create(
-			array(
-				'parent_id' => $parentAcoId,
-				'alias' => $alias
-			)
-		);
+        // Create the Aco - alias belongs to parent
+        $this->Acl->Aco->create(
+            [
+                'parent_id' => $parentAcoId,
+                'alias' => $alias
+            ]
+        );
 
-		// Try and save it
-		if ($this->Acl->Aco->save()) {
-			// If successful, return the id
-			return $this->Acl->Aco->id;
-		} else {
-			// else, return false
-			return false;
-		}
+        // Try and save it
+        if ($this->Acl->Aco->save()) {
+            // If successful, return the id
+            return $this->Acl->Aco->id;
+        } else {
+            // else, return false
+            return false;
+        }
 
-	}
+    }
 
 /**
  * Set permissions for a given node
@@ -217,56 +207,58 @@ class AclPermissionsController extends AclPermissionAppController {
  * @param int $node
  * @return array booelan
  */
-	private function __set_permission($permissionType = '', $permission, $node) {
+    private function setPermission($permissionType = '', $permission, $node)
+    {
 
-		// $permission[$permissionType] holds the group ids concatenated with '/'
-		// so break them apart
-		$groups = explode('/', $permission[$permissionType]);
+        // $permission[$permissionType] holds the group ids concatenated with '/'
+        // so break them apart
+        $groups = explode('/', $permission[$permissionType]);
 
-		$userRoleModel = Configure::read('userRoleModel');
+        $userRoleModel = Configure::read('userRoleModel');
 
-		// Now loop through them
-		foreach ($groups as $groupId) {
+        // Now loop through them
+        foreach ($groups as $groupId) {
 
-			// Get the actual Group
-			$aclGroup = $this->AclGroup->findById($groupId);
+            // Get the actual Group
+            $aclGroup = $this->AclGroup->findById($groupId);
 
-			// If the Group does not exist, get outta here
-			if (empty($aclGroup['AclGroup'])) {
-				return false;
-			}
+            // If the Group does not exist, get outta here
+            if (empty($aclGroup['AclGroup'])) {
+                return false;
+            }
 
-			// As the key is AclGroup rather than Group, create a new properly formed variable
-			$group[$userRoleModel] = $aclGroup['AclGroup'];
+            // As the key is AclGroup rather than Group, create a new properly formed variable
+            $group[$userRoleModel] = $aclGroup['AclGroup'];
 
-			// Make sure the group is OK
-			if (!empty($group[$userRoleModel])) {
+            // Make sure the group is OK
+            if (! empty($group[$userRoleModel])) {
 
-				// Then act on the permission type
+                // Then act on the permission type
 
-				// and set the appropraite permissions
-				if ($permissionType == 'allow') {
-					$this->Acl->allow($group, $node);
-				} else {
-					$this->Acl->deny($group, $node);
-				}
+                // and set the appropraite permissions
+                if ($permissionType == 'allow') {
+                    $this->Acl->allow($group, $node);
+                } else {
+                    $this->Acl->deny($group, $node);
+                }
 
-				$this->AclPermission->id = $permission['id'];
-				$this->AclPermission->set('complete', 1);
-				$this->AclPermission->save();
+                $this->AclPermission->id = $permission['id'];
+                $this->AclPermission->set('complete', 1);
+                $this->AclPermission->save();
 
-			}
+            }
 
-		}
+        }
 
-		return;
+        return;
 
-	}
+    }
 
-	public function reverse_engineer() {
+    public function reverse_engineer()
+    {
 
-		$aco = $this->AclAcos->reverse_engineer();
+        $aco = $this->AclAcos->reverseEngineer();
 
-	}
+    }
 
 }
